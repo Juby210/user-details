@@ -1,0 +1,7 @@
+{
+    "name": "User Details",
+    "description": "Displays when user created account, joined to server and when sent last message in selected server / dm.",
+    "author": "Juby210#0577",
+    "version": "1.0.0",
+    "license": "MIT"
+}
