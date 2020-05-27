@@ -25,6 +25,11 @@ module.exports = class Settings extends React.PureComponent {
                 value={ this.props.getSetting('lastMessage', true) }
                 onChange={ () => this.props.toggleSetting('lastMessage', true) }
             >Display "Last message"</SwitchItem>
+
+            <SwitchItem
+                value={ this.props.getSetting('hour12') }
+                onChange={ () => this.props.toggleSetting('hour12') }
+            >12-hour time format</SwitchItem>
         </>
     }
 }

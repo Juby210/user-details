@@ -30,7 +30,7 @@ module.exports = class UserDetails extends Plugin {
             if (!arr) return res
 
             const { user } = findInReactTree(arr, p => p.user), gid = g.getGuildId()
-            if (_this.settings.get('createdAt', true)) text.push(React.createElement('div', null, `Created at: ${user.createdAt.toLocaleString()}`))
+            if (_this.settings.get('createdAt', true)) text.push(React.createElement('div', null, `Created at: ${_this.dateToString(user.createdAt)}`))
             if (user.discriminator != '0000') {
                 const gid2 = gid ? gid : c.getChannelId()
                 _this.createCache(user.id, gid2)
@@ -46,21 +46,22 @@ module.exports = class UserDetails extends Plugin {
                             }
                             fetchingMember = false
                         })
-                    } else text.push(React.createElement('div', null, `Joined at: ${cache[user.id][gid].joinedAt.toLocaleString()}`))
+                    } else text.push(React.createElement('div', null, `Joined at: ${_this.dateToString(cache[user.id][gid].joinedAt)}`))
                 }
                 if (_this.settings.get('lastMessage', true)) {
-                    if (!cache[user.id][gid2].lastMessage) {
+                    const c = cache[user.id][gid2]
+                    if (!c.lastMessage) {
                         fetchingLast = true
                         _this.search(user.id, gid2, !gid).then(res => {
                             if (res && res.messages && res.messages[0]) {
                                 const hit = res.messages[0].find(m => m.hit)
-                                if (!hit) cache[user.id][gid2].lastMessage = '-'
-                                else cache[user.id][gid2].lastMessage = new Date(hit.timestamp).toLocaleString()
-                            } else cache[user.id][gid2].lastMessage = '-'
+                                if (!hit) c.lastMessage = '-'
+                                else c.lastMessage = new Date(hit.timestamp)
+                            } else c.lastMessage = '-'
                             fetchingLast = false
                             if (!fetchingMember) setTimeout(() => _this.forceUpdate(user))
-                        })
-                    } else text.push(React.createElement('div', null, `Last message: ${cache[user.id][gid2].lastMessage.toLocaleString()}`))
+                        }).catch(() => c.lastMessage = '-')
+                    } else text.push(React.createElement('div', null, `Last message: ${c.lastMessage == '-' ? '-' : _this.dateToString(c.lastMessage)}`))
                 }
             }
             arr.splice(popout ? 2 : 1, 0, React.createElement('div', { className: `user-details-text${popout ? ' user-details-center' : ''} ${textRow}` }, ...text))
@@ -88,6 +89,10 @@ module.exports = class UserDetails extends Plugin {
     createCache(id, gid) {
         if (!cache[id]) cache[id] = {}
         if (!cache[id][gid]) cache[id][gid] = {}
+    }
+
+    dateToString(date) {
+        return date.toLocaleString('arab', { hour12: this.settings.get('hour12') })
     }
 
     // i really can't find better way to rerender ~~pls make pr with better way~~
