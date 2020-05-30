@@ -1,4 +1,3 @@
-const { resolve } = require('path')
 const { Plugin } = require('powercord/entities')
 const { findInReactTree } = require('powercord/util')
 const { getModule, getModuleByDisplayName, constants: { Endpoints }, http: { get }, React } = require('powercord/webpack')
@@ -9,12 +8,13 @@ const Settings = require('./Settings')
 
 module.exports = class UserDetails extends Plugin {
     async startPlugin() {
-        this.registerSettings('user-details', 'User Details', Settings)
-        this.loadCSS(resolve(__dirname, 'style.css'))
+        powercord.api.settings.registerSettings('user-details', {
+            category: this.entityID, label: 'User Details', render: Settings })
+        this.loadStylesheet('style.css')
 
         const _this = this
         const g = await getModule(['getGuildId'])
-        const c = await getModule(['getLastSelectedChannelId'])
+        const lc = await getModule(['getLastSelectedChannelId'])
         const dispatcher = await getModule(['dispatch'])
         const { textRow } = await getModule(['textRow'])
         const AnalyticsContext = await getModuleByDisplayName('AnalyticsContext')
@@ -32,24 +32,28 @@ module.exports = class UserDetails extends Plugin {
             const { user } = findInReactTree(arr, p => p.user), gid = g.getGuildId()
             if (_this.settings.get('createdAt', true)) text.push(React.createElement('div', null, `Created at: ${_this.dateToString(user.createdAt)}`))
             if (user.discriminator != '0000') {
-                const gid2 = gid ? gid : c.getChannelId()
+                const gid2 = gid ? gid : lc.getChannelId()
                 _this.createCache(user.id, gid2)
+                const c = cache[user.id][gid2]
                 let fetchingMember, fetchingLast
 
                 if (_this.settings.get('joinedAt', true) && gid) {
-                    if (!cache[user.id][gid].joinedAt) {
+                    if (!c.joinedAt) {
                         fetchingMember = true
                         _this.fetchMember(gid, user.id).then(res => {
                             if (res && res.joined_at) {
-                                cache[user.id][gid].joinedAt = new Date(res.joined_at)
+                                c.joinedAt = new Date(res.joined_at)
                                 if (!fetchingLast) setTimeout(() => _this.forceUpdate(user))
                             }
                             fetchingMember = false
+                        }).catch(res => {
+                            if (res.body && res.body.code == 10007) c.joinedAt = '-' // Unknown Member
+                            else if (res.body && res.body.retry_after) setTimeout(() => _this.forceUpdate(user), res.body.retry_after + 10)
+                            fetchingMember = false
                         })
-                    } else text.push(React.createElement('div', null, `Joined at: ${_this.dateToString(cache[user.id][gid].joinedAt)}`))
+                    } else text.push(React.createElement('div', null, `Joined at: ${_this.dateToString(c.joinedAt)}`))
                 }
                 if (_this.settings.get('lastMessage', true)) {
-                    const c = cache[user.id][gid2]
                     if (!c.lastMessage) {
                         fetchingLast = true
                         _this.search(user.id, gid2, !gid).then(res => {
@@ -61,7 +65,7 @@ module.exports = class UserDetails extends Plugin {
                             fetchingLast = false
                             if (!fetchingMember) setTimeout(() => _this.forceUpdate(user))
                         }).catch(() => c.lastMessage = '-')
-                    } else text.push(React.createElement('div', null, `Last message: ${c.lastMessage == '-' ? '-' : _this.dateToString(c.lastMessage)}`))
+                    } else text.push(React.createElement('div', null, `Last message: ${_this.dateToString(c.lastMessage)}`))
                 }
             }
             arr.splice(popout ? 2 : 1, 0, React.createElement('div', { className: `user-details-text${popout ? ' user-details-center' : ''} ${textRow}` }, ...text))
@@ -70,7 +74,7 @@ module.exports = class UserDetails extends Plugin {
         })
 
         dispatcher.subscribe('MESSAGE_CREATE', this.onMessage = m => {
-            if (!m.message) return
+            if (!this.settings.get('lastMessage', true) || !m.message) return
             const msg = m.message, gid = msg.guild_id ? msg.guild_id : msg.channel_id
             this.createCache(msg.author.id, gid)
             cache[msg.author.id][gid].lastMessage = new Date(msg.timestamp)
@@ -78,6 +82,7 @@ module.exports = class UserDetails extends Plugin {
     }
 
     async pluginWillUnload() {
+        powercord.api.settings.unregisterSettings('user-details')
         uninject('user-details')
 
         if (this.onMessage) {
@@ -92,6 +97,22 @@ module.exports = class UserDetails extends Plugin {
     }
 
     dateToString(date) {
+        if (date == '-') return '-'
+        if (this.settings.get('custom')) {
+            let h = date.getHours(), ampm = ''
+            if (this.settings.get('hour12')) {
+                ampm = h >= 12 ? 'PM' : 'AM'
+                h = h % 12 || 12
+            }
+            return this.settings.get('format', '%d.%m.%y, %H:%M:%S %ampm')
+                .replace('%d', ('0' + date.getDate()).substr(-2))
+                .replace('%m', ('0' + (date.getMonth() + 1)).substr(-2))
+                .replace('%y', date.getFullYear())
+                .replace('%H', ('0' + h).substr(-2))
+                .replace('%M', ('0' + date.getMinutes()).substr(-2))
+                .replace('%S', ('0' + date.getSeconds()).substr(-2))
+                .replace('%ampm', ampm)
+        }
         return date.toLocaleString('arab', { hour12: this.settings.get('hour12') })
     }
 
@@ -110,7 +131,7 @@ module.exports = class UserDetails extends Plugin {
 
     // why members in discord cache doesn't have joinedAt :<
     async fetchMember(gid, id) {
-        const data = await get({ url: Endpoints.GUILD_MEMBER(gid, id) })
+        const data = await get(Endpoints.GUILD_MEMBER(gid, id))
         return data.body
     }
 
