@@ -23,8 +23,9 @@ module.exports = class Settings extends React.PureComponent {
             >Display "Joined at"</SwitchItem>
             <SwitchItem
                 value={ this.props.getSetting('lastMessage', true) }
+                note='Click on "Last message" to toggle it to "First message"'
                 onChange={ () => this.props.toggleSetting('lastMessage', true) }
-            >Display "Last message"</SwitchItem>
+            >Display "Last/First message"</SwitchItem>
 
             <SwitchItem
                 value={ this.props.getSetting('hour12') }

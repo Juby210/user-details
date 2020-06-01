@@ -54,18 +54,39 @@ module.exports = class UserDetails extends Plugin {
                     } else text.push(React.createElement('div', null, `Joined at: ${_this.dateToString(c.joinedAt)}`))
                 }
                 if (_this.settings.get('lastMessage', true)) {
-                    if (!c.lastMessage) {
-                        fetchingLast = true
-                        _this.search(user.id, gid2, !gid).then(res => {
-                            if (res && res.messages && res.messages[0]) {
-                                const hit = res.messages[0].find(m => m.hit)
-                                if (!hit) c.lastMessage = '-'
-                                else c.lastMessage = new Date(hit.timestamp)
-                            } else c.lastMessage = '-'
-                            fetchingLast = false
-                            if (!fetchingMember) setTimeout(() => _this.forceUpdate(user))
-                        }).catch(() => c.lastMessage = '-')
-                    } else text.push(React.createElement('div', null, `Last message: ${_this.dateToString(c.lastMessage)}`))
+                    if (!this.state || !this.state.firstMessage) {
+                        if (!c.lastMessage) {
+                            fetchingLast = true
+                            _this.search(user.id, gid2, !gid).then(res => {
+                                if (res && res.messages && res.messages[0]) {
+                                    const hit = res.messages[0].find(m => m.hit)
+                                    if (!hit) c.lastMessage = '-'
+                                    else c.lastMessage = new Date(hit.timestamp)
+                                } else c.lastMessage = '-'
+                                fetchingLast = false
+                                if (!fetchingMember) setTimeout(() => _this.forceUpdate(user))
+                            }).catch(() => c.lastMessage = '-')
+                        } else text.push(React.createElement('div', { onClick: () => {
+                            this.setState({ firstMessage: true })
+                            setTimeout(() => _this.forceUpdate(user))
+                        } }, `Last message: ${_this.dateToString(c.lastMessage)}`))
+                    } else {
+                        if (!c.firstMessage) {
+                            fetchingLast = true
+                            _this.search(user.id, gid2, !gid, true).then(res => {
+                                if (res && res.messages && res.messages[0]) {
+                                    const hit = res.messages[0].find(m => m.hit)
+                                    if (!hit) c.firstMessage = '-'
+                                    else c.firstMessage = new Date(hit.timestamp)
+                                } else c.firstMessage = '-'
+                                fetchingLast = false
+                                if (!fetchingMember) setTimeout(() => _this.forceUpdate(user))
+                            }).catch(() => c.firstMessage = '-')
+                        } else text.push(React.createElement('div', { onClick: () => {
+                            this.setState({ firstMessage: false })
+                            setTimeout(() => _this.forceUpdate(user))
+                        } }, `First message: ${_this.dateToString(c.firstMessage)}`))
+                    }
                 }
             }
             arr.splice(popout ? 2 : 1, 0, React.createElement('div', { className: `user-details-text${popout ? ' user-details-center' : ''} ${textRow}` }, ...text))
@@ -136,10 +157,11 @@ module.exports = class UserDetails extends Plugin {
     }
 
     // contains code by Bowser65 (Powercord's server, https://discord.com/channels/538759280057122817/539443165455974410/662376605418782730)
-    search(author_id, id, dm) {
+    search(author_id, id, dm, asc) {
         return new Promise((resolve, reject) => {
             const Search = getModule(m => m.prototype && m.prototype.retryLater, false)
-            const s = new Search(id, dm ? 'DM' : 'GUILD', { author_id })
+            let opts = { author_id, include_nsfw: true }
+            const s = new Search(id, dm ? 'DM' : 'GUILD', asc ? { offset: 0, sort_by: 'timestamp', sort_order: 'asc', ...opts } : opts)
             s.fetch(res => resolve(res.body), () => void 0, reject)
         })
     }
