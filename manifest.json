@@ -2,6 +2,6 @@
     "name": "User Details",
     "description": "Displays when user created account, joined to server and when sent last or first message in selected server / dm.",
     "author": "Juby210#0577",
-    "version": "1.0.2",
+    "version": "1.0.3",
     "license": "MIT"
 }

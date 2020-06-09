@@ -1,6 +1,6 @@
 const { Plugin } = require('powercord/entities')
 const { findInReactTree } = require('powercord/util')
-const { getModule, getModuleByDisplayName, constants: { Endpoints }, http: { get }, React } = require('powercord/webpack')
+const { getModule, getModuleByDisplayName, constants: { Endpoints }, http: { get }, i18n, React } = require('powercord/webpack')
 const { inject, uninject } = require('powercord/injector')
 const cache = {}
 
@@ -134,7 +134,7 @@ module.exports = class UserDetails extends Plugin {
                 .replace('%S', ('0' + date.getSeconds()).substr(-2))
                 .replace('%ampm', ampm)
         }
-        return date.toLocaleString('arab', { hour12: this.settings.get('hour12') })
+        return date.toLocaleString(i18n.getLocale(), { hour12: this.settings.get('hour12') })
     }
 
     // i really can't find better way to rerender ~~pls make pr with better way~~
