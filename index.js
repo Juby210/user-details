@@ -1,6 +1,7 @@
 const { Plugin } = require('powercord/entities')
 const { findInReactTree } = require('powercord/util')
-const { getModule, getModuleByDisplayName, constants: { Endpoints }, http: { get }, i18n, React } = require('powercord/webpack')
+const { getModule, getModuleByDisplayName, constants: { Endpoints }, channels, http: { get }, i18n, React } = require('powercord/webpack')
+const { AsyncComponent } = require('powercord/components')
 const { inject, uninject } = require('powercord/injector')
 const cache = {}
 
@@ -14,8 +15,9 @@ module.exports = class UserDetails extends Plugin {
 
         const _this = this
         const g = await getModule(['getGuildId'])
-        const lc = await getModule(['getLastSelectedChannelId'])
         const dispatcher = await getModule(['dispatch'])
+        const { getChannel } = await getModule(['getChannel'])
+        const { getCurrentUser } = await getModule(['getCurrentUser'])
         const { textRow } = await getModule(['textRow'])
         const AnalyticsContext = await getModuleByDisplayName('AnalyticsContext')
 
@@ -32,62 +34,63 @@ module.exports = class UserDetails extends Plugin {
             const { user } = findInReactTree(arr, p => p.user), gid = g.getGuildId()
             if (_this.settings.get('createdAt', true)) text.push(React.createElement('div', null, `Created at: ${_this.dateToString(user.createdAt)}`))
             if (user.discriminator != '0000') {
-                const gid2 = gid ? gid : lc.getChannelId()
+                const gid2 = gid || channels.getChannelId()
+                const dontFetchLast = gid ? false : !(getCurrentUser().id == user.id || !getChannel(gid2) || getChannel(gid2).recipients.includes(user.id))
                 _this.createCache(user.id, gid2)
                 const c = cache[user.id][gid2]
-                let fetchingMember, fetchingLast
 
-                if (_this.settings.get('joinedAt', true) && gid) {
-                    if (!c.joinedAt) {
-                        fetchingMember = true
-                        _this.fetchMember(gid, user.id).then(res => {
-                            if (res && res.joined_at) {
-                                c.joinedAt = new Date(res.joined_at)
-                                if (!fetchingLast) setTimeout(() => _this.forceUpdate(user))
-                            }
-                            fetchingMember = false
-                        }).catch(res => {
-                            if (res.body && res.body.code == 10007) c.joinedAt = '-' // Unknown Member
-                            else if (res.body && res.body.retry_after) setTimeout(() => _this.forceUpdate(user), res.body.retry_after + 10)
-                            fetchingMember = false
+                if (_this.settings.get('joinedAt', true) && gid) text.push(React.createElement(AsyncComponent, { _provider: async () => {
+                    const joinedAt = c.joinedAt || await _this.fetchMemberPromise(gid, gid2, user.id)
+                    return () => React.createElement('div', null, `Joined at: ${_this.dateToString(joinedAt)}`)
+                }}))
+                if (_this.settings.get('lastMessage', true)) text.push(React.createElement(AsyncComponent, { _provider: async () => {
+                    const lastMessage = dontFetchLast ? '-' : c.lastMessage || await new Promise(r => {
+                        _this.search(user.id, gid2, !gid).then(res => {
+                            if (res && res.messages && res.messages[0]) {
+                                const hit = res.messages[0].find(m => m.hit)
+                                if (!hit) c.lastMessage = '-'
+                                else c.lastMessage = new Date(hit.timestamp)
+                            } else c.lastMessage = '-'
+                            r(c.lastMessage)
+                        }).catch(() => {
+                            c.lastMessage = '-'
+                            r(c.lastMessage)
                         })
-                    } else text.push(React.createElement('div', null, `Joined at: ${_this.dateToString(c.joinedAt)}`))
-                }
-                if (_this.settings.get('lastMessage', true)) {
-                    if (!this.state || !this.state.firstMessage) {
-                        if (!c.lastMessage) {
-                            fetchingLast = true
-                            _this.search(user.id, gid2, !gid).then(res => {
-                                if (res && res.messages && res.messages[0]) {
-                                    const hit = res.messages[0].find(m => m.hit)
-                                    if (!hit) c.lastMessage = '-'
-                                    else c.lastMessage = new Date(hit.timestamp)
-                                } else c.lastMessage = '-'
-                                fetchingLast = false
-                                if (!fetchingMember) setTimeout(() => _this.forceUpdate(user))
-                            }).catch(() => c.lastMessage = '-')
-                        } else text.push(React.createElement('div', { onClick: () => {
-                            this.setState({ firstMessage: true })
-                            setTimeout(() => _this.forceUpdate(user))
-                        } }, `Last message: ${_this.dateToString(c.lastMessage)}`))
-                    } else {
-                        if (!c.firstMessage) {
-                            fetchingLast = true
-                            _this.search(user.id, gid2, !gid, true).then(res => {
-                                if (res && res.messages && res.messages[0]) {
-                                    const hit = res.messages[0].find(m => m.hit)
-                                    if (!hit) c.firstMessage = '-'
-                                    else c.firstMessage = new Date(hit.timestamp)
-                                } else c.firstMessage = '-'
-                                fetchingLast = false
-                                if (!fetchingMember) setTimeout(() => _this.forceUpdate(user))
-                            }).catch(() => c.firstMessage = '-')
-                        } else text.push(React.createElement('div', { onClick: () => {
-                            this.setState({ firstMessage: false })
-                            setTimeout(() => _this.forceUpdate(user))
-                        } }, `First message: ${_this.dateToString(c.firstMessage)}`))
+                    })
+                    return class extends React.PureComponent {
+                        constructor(props) {
+                            super(props)
+
+                            this.state = { firstMessage: false }
+                        }
+
+                        render() {
+                            if (this.state.firstMessage) return React.createElement(AsyncComponent, { _provider: async () => {
+                                const firstMessage = c.firstMessage || await new Promise(r => {
+                                    _this.search(user.id, gid2, !gid, true).then(res => {
+                                        if (res && res.messages && res.messages[0]) {
+                                            const hit = res.messages[0].find(m => m.hit)
+                                            if (!hit) c.firstMessage = '-'
+                                            else c.firstMessage = new Date(hit.timestamp)
+                                        } else c.firstMessage = '-'
+                                        r(c.firstMessage)
+                                    }).catch(() => {
+                                        c.firstMessage = '-'
+                                        r(c.firstMessage)
+                                    })
+                                })
+                                return () => React.createElement('div', {
+                                    style: { cursor: 'pointer' },
+                                    onClick: () => this.setState({ firstMessage: false })
+                                }, `First message: ${_this.dateToString(firstMessage)}`)
+                            }})
+                            return React.createElement('div', dontFetchLast ? null : {
+                                style: { cursor: 'pointer' },
+                                onClick: () => this.setState({ firstMessage: true })
+                            }, `Last message: ${_this.dateToString(lastMessage)}`)
+                        }
                     }
-                }
+                }}))
             }
             arr.splice(popout ? 2 : 1, 0, React.createElement('div', { className: `user-details-text${popout ? ' user-details-center' : ''} ${textRow}` }, ...text))
 
@@ -126,28 +129,35 @@ module.exports = class UserDetails extends Plugin {
                 h = h % 12 || 12
             }
             return this.settings.get('format', '%d.%m.%y, %H:%M:%S %ampm')
-                .replace('%d', ('0' + date.getDate()).substr(-2))
-                .replace('%m', ('0' + (date.getMonth() + 1)).substr(-2))
-                .replace('%y', date.getFullYear())
-                .replace('%H', ('0' + h).substr(-2))
-                .replace('%M', ('0' + date.getMinutes()).substr(-2))
-                .replace('%S', ('0' + date.getSeconds()).substr(-2))
-                .replace('%ampm', ampm)
+                .replace(/%d/g, ('0' + date.getDate()).substr(-2))
+                .replace(/%m/g, ('0' + (date.getMonth() + 1)).substr(-2))
+                .replace(/%y/g, date.getFullYear())
+                .replace(/%H/g, ('0' + h).substr(-2))
+                .replace(/%M/g, ('0' + date.getMinutes()).substr(-2))
+                .replace(/%S/g, ('0' + date.getSeconds()).substr(-2))
+                .replace(/%ampm/g, ampm)
         }
         return date.toLocaleString(i18n.getLocale(), { hour12: this.settings.get('hour12') })
     }
 
-    // i really can't find better way to rerender ~~pls make pr with better way~~
-    async forceUpdate(user) {
-        const a = await getModule(['getActivities'])
-        const dispatcher = await getModule(['dispatch'])
-
-        const activities = a.getActivities(user.id)
-        const clientStatus = a.getState().clientStatuses[user.id] || {}
-        const status = a.getStatus(user.id)
-
-        dispatcher.dispatch({ type: 'PRESENCE_UPDATE', activities, clientStatus, status: status != 'offline' ? 'offline' : 'online', user })
-        setTimeout(dispatcher.dispatch({ type: 'PRESENCE_UPDATE', activities, clientStatus, status, user }))
+    fetchMemberPromise(gid, gid2, id, resolve) {
+        const c = cache[id][gid2]
+        return new Promise(r => {
+            this.fetchMember(gid, id).then(res => {
+                if (res && res.joined_at) {
+                    c.joinedAt = new Date(res.joined_at)
+                    if (typeof resolve == 'function') resolve(c.joinedAt)
+                    r(c.joinedAt)
+                }
+            }).catch(res => {
+                if (res.body && res.body.code == 10007) { // Unknown Member
+                    c.joinedAt = '-'
+                    if (typeof resolve == 'function') resolve(c.joinedAt)
+                    r(c.joinedAt)
+                } else if (res.body && res.body.retry_after) setTimeout(() => this.fetchMemberPromise(gid, gid2, id, resolve || r), res.body.retry_after + 10)
+                else r('-')
+            })
+        })
     }
 
     // why members in discord cache doesn't have joinedAt :<
