@@ -32,7 +32,7 @@ module.exports = class UserDetails extends Plugin {
             if (!arr) return res
 
             const { user } = findInReactTree(arr, p => p.user), gid = g.getGuildId()
-            if (_this.settings.get('createdAt', true)) text.push(React.createElement('div', null, `Created at: ${_this.dateToString(user.createdAt)}`))
+            if (_this.settings.get('createdAt', true)) text.push(React.createElement('div', null, `Created at: ${_this.dateToString(user.createdAt, popout)}`))
             if (user.discriminator != '0000') {
                 const gid2 = gid || channels.getChannelId()
                 const dontFetchLast = gid ? false : !(getCurrentUser().id == user.id || !getChannel(gid2) || getChannel(gid2).recipients.includes(user.id))
@@ -41,7 +41,7 @@ module.exports = class UserDetails extends Plugin {
 
                 if (_this.settings.get('joinedAt', true) && gid) text.push(React.createElement(AsyncComponent, { _provider: async () => {
                     const joinedAt = c.joinedAt || await _this.fetchMemberPromise(gid, gid2, user.id)
-                    return () => React.createElement('div', null, `Joined at: ${_this.dateToString(joinedAt)}`)
+                    return () => React.createElement('div', null, `Joined at: ${_this.dateToString(joinedAt, popout)}`)
                 }}))
                 if (_this.settings.get('lastMessage', true)) text.push(React.createElement(AsyncComponent, { _provider: async () => {
                     const lastMessage = dontFetchLast ? '-' : c.lastMessage || await new Promise(r => {
@@ -82,12 +82,12 @@ module.exports = class UserDetails extends Plugin {
                                 return () => React.createElement('div', {
                                     style: { cursor: 'pointer' },
                                     onClick: () => this.setState({ firstMessage: false })
-                                }, `First message: ${_this.dateToString(firstMessage)}`)
+                                }, `First message: ${_this.dateToString(firstMessage, popout)}`)
                             }})
                             return React.createElement('div', dontFetchLast ? null : {
                                 style: { cursor: 'pointer' },
                                 onClick: () => this.setState({ firstMessage: true })
-                            }, `Last message: ${_this.dateToString(lastMessage)}`)
+                            }, `Last message: ${_this.dateToString(lastMessage, popout)}`)
                         }
                     }
                 }}))
@@ -120,15 +120,16 @@ module.exports = class UserDetails extends Plugin {
         if (!cache[id][gid]) cache[id][gid] = {}
     }
 
-    dateToString(date) {
+    dateToString(date, popout) {
         if (date == '-') return '-'
-        if (this.settings.get('custom')) {
+        const customPopout = popout && this.settings.get('custom2')
+        if (this.settings.get('custom') || customPopout) {
             let h = date.getHours(), ampm = ''
             if (this.settings.get('hour12')) {
                 ampm = h >= 12 ? 'PM' : 'AM'
                 h = h % 12 || 12
             }
-            return this.settings.get('format', '%d.%m.%y, %H:%M:%S %ampm')
+            return this.settings.get(customPopout ? 'format2' : 'format', this.settings.get('format', '%d.%m.%y, %H:%M:%S %ampm'))
                 .replace(/%d/g, ('0' + date.getDate()).substr(-2))
                 .replace(/%m/g, ('0' + (date.getMonth() + 1)).substr(-2))
                 .replace(/%y/g, date.getFullYear())

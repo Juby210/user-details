@@ -36,12 +36,22 @@ module.exports = class Settings extends React.PureComponent {
                 note='If you have this option off, the time format is based on your locale'
                 onChange={ () => this.props.toggleSetting('custom') }
             >Custom time format</SwitchItem>
+            <SwitchItem
+                value={ this.props.getSetting('custom2') }
+                onChange={ () => this.props.toggleSetting('custom2') }
+                note='If you have this option off, the time format is based on custom time format'
+            >Custom format for popout</SwitchItem>
             <TextInput
                 value={ this.props.getSetting('format', '%d.%m.%y, %H:%M:%S %ampm') }
                 note='Variables: %d - day, %m - month, %y - year, %H - hour, %M - minute, %S - second, %ampm - AM/PM if 12-hour format is enabled'
                 disabled={ !this.props.getSetting('custom') }
                 onChange={ val => this.props.updateSetting('format', val) }
             >Format</TextInput>
+            <TextInput
+                value={ this.props.getSetting('format2', this.props.getSetting('format', '%d.%m.%y, %H:%M:%S %ampm')) }
+                disabled={ !this.props.getSetting('custom2') }
+                onChange={ val => this.props.updateSetting('format2', val) }
+            >Format for popout</TextInput>
         </>
     }
 }
