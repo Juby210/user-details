@@ -14,7 +14,7 @@ module.exports = class UserDetails extends Plugin {
         this.loadStylesheet('style.css')
 
         const _this = this
-        const g = await getModule(['getGuildId'])
+        const g = await getModule(['getGuildId', 'getLastSelectedGuildId'])
         const dispatcher = await getModule(['dispatch'])
         const { getChannel } = await getModule(['getChannel'])
         const { getCurrentUser } = await getModule(['getCurrentUser'])
