@@ -43,54 +43,61 @@ module.exports = class UserDetails extends Plugin {
                     const joinedAt = c.joinedAt || await _this.fetchMemberPromise(gid, gid2, user.id)
                     return () => React.createElement('div', null, `Joined at: ${_this.dateToString(joinedAt, popout)}`)
                 }}))
-                if (_this.settings.get('lastMessage', true)) text.push(React.createElement(AsyncComponent, { _provider: async () => {
-                    const lastMessage = dontFetchLast ? '-' : c.lastMessage || await new Promise(r => {
-                        _this.search(user.id, gid2, !gid).then(res => {
-                            if (res && res.messages && res.messages[0]) {
-                                const hit = res.messages[0].find(m => m.hit)
-                                if (!hit) c.lastMessage = '-'
-                                else c.lastMessage = new Date(hit.timestamp)
-                            } else c.lastMessage = '-'
-                            r(c.lastMessage)
-                        }).catch(() => {
-                            c.lastMessage = '-'
-                            r(c.lastMessage)
-                        })
-                    })
-                    return class extends React.PureComponent {
-                        constructor(props) {
-                            super(props)
+                if (_this.settings.get('lastMessage', true)) text.push(React.createElement(class extends React.PureComponent {
+                    constructor(props) {
+                        super(props)
 
-                            this.state = { firstMessage: false }
-                        }
-
-                        render() {
-                            if (this.state.firstMessage) return React.createElement(AsyncComponent, { _provider: async () => {
-                                const firstMessage = c.firstMessage || await new Promise(r => {
-                                    _this.search(user.id, gid2, !gid, true).then(res => {
-                                        if (res && res.messages && res.messages[0]) {
-                                            const hit = res.messages[0].find(m => m.hit)
-                                            if (!hit) c.firstMessage = '-'
-                                            else c.firstMessage = new Date(hit.timestamp)
-                                        } else c.firstMessage = '-'
-                                        r(c.firstMessage)
-                                    }).catch(() => {
-                                        c.firstMessage = '-'
-                                        r(c.firstMessage)
-                                    })
-                                })
-                                return () => React.createElement('div', {
-                                    style: { cursor: 'pointer' },
-                                    onClick: () => this.setState({ firstMessage: false })
-                                }, `First message: ${_this.dateToString(firstMessage, popout)}`)
-                            }})
-                            return React.createElement('div', dontFetchLast ? null : {
-                                style: { cursor: 'pointer' },
-                                onClick: () => this.setState({ firstMessage: true })
-                            }, `Last message: ${_this.dateToString(lastMessage, popout)}`)
-                        }
+                        this.state = { lastMessage: null, firstMessage: null, firstMessageSelected: _this.settings.get('defaultFirstMessage') }
                     }
-                }}))
+
+                    async componentDidMount() {
+                        if (!this.state.firstMessageSelected && !this.state.lastMessage) this.setState({
+                            lastMessage: dontFetchLast ? '-' : c.lastMessage || await new Promise(r => {
+                                _this.search(user.id, gid2, !gid).then(res => {
+                                    if (res && res.messages && res.messages[0]) {
+                                        const hit = res.messages[0].find(m => m.hit)
+                                        if (!hit) c.lastMessage = '-'
+                                        else c.lastMessage = new Date(hit.timestamp)
+                                    } else c.lastMessage = '-'
+                                    r(c.lastMessage)
+                                }).catch(() => {
+                                    c.lastMessage = '-'
+                                    r(c.lastMessage)
+                                })
+                            })
+                        }); else if (this.state.firstMessageSelected && !this.state.firstMessage) this.setState({
+                            firstMessage: dontFetchLast ? '-' : c.firstMessage || await new Promise(r => {
+                                _this.search(user.id, gid2, !gid, true).then(res => {
+                                    if (res && res.messages && res.messages[0]) {
+                                        const hit = res.messages[0].find(m => m.hit)
+                                        if (!hit) c.firstMessage = '-'
+                                        else c.firstMessage = new Date(hit.timestamp)
+                                    } else c.firstMessage = '-'
+                                    r(c.firstMessage)
+                                }).catch(() => {
+                                    c.firstMessage = '-'
+                                    r(c.firstMessage)
+                                })
+                            })
+                        })
+                    }
+                    componentDidUpdate = this.componentDidMount
+
+                    render() {
+                        if (!this.state.firstMessageSelected && !this.state.lastMessage ||
+                            this.state.firstMessageSelected && !this.state.firstMessage
+                        ) return null
+
+                        if (this.state.firstMessageSelected) return React.createElement('div', dontFetchLast ? null : {
+                            style: { cursor: 'pointer' },
+                            onClick: () => this.setState({ firstMessageSelected: false })
+                        }, `First message: ${_this.dateToString(this.state.firstMessage, popout)}`)
+                        return React.createElement('div', dontFetchLast ? null : {
+                            style: { cursor: 'pointer' },
+                            onClick: () => this.setState({ firstMessageSelected: true })
+                        }, `Last message: ${_this.dateToString(this.state.lastMessage, popout)}`)
+                    }
+                }))
             }
             arr.splice(popout ? 2 : 1, 0, React.createElement('div', { className: `user-details-text${popout ? ' user-details-center' : ''} ${textRow}` }, ...text))
 
