@@ -1,6 +1,6 @@
 const { Plugin } = require('powercord/entities')
 const { findInReactTree } = require('powercord/util')
-const { getModule, getModuleByDisplayName, constants: { Endpoints }, channels, http: { get }, i18n, React } = require('powercord/webpack')
+const { getModule, getModuleByDisplayName, channels, i18n, FluxDispatcher, React } = require('powercord/webpack')
 const { AsyncComponent } = require('powercord/components')
 const { inject, uninject } = require('powercord/injector')
 const cache = {}
@@ -15,7 +15,6 @@ module.exports = class UserDetails extends Plugin {
 
         const _this = this
         const g = await getModule(['getGuildId', 'getLastSelectedGuildId'])
-        const dispatcher = await getModule(['dispatch'])
         const { getChannel } = await getModule(['getChannel'])
         const { getCurrentUser } = await getModule(['getCurrentUser'])
         const { textRow } = await getModule(['textRow'])
@@ -40,7 +39,7 @@ module.exports = class UserDetails extends Plugin {
                 const c = cache[user.id][gid2]
 
                 if (_this.settings.get('joinedAt', true) && gid) text.push(React.createElement(AsyncComponent, { _provider: async () => {
-                    const joinedAt = c.joinedAt || await _this.fetchMemberPromise(gid, gid2, user.id)
+                    const joinedAt = c.joinedAt || await _this.fetchJoinedAt(gid, user.id)
                     return () => React.createElement('div', null, `Joined at: ${_this.dateToString(joinedAt, popout)}`)
                 }}))
                 if (_this.settings.get('lastMessage', true)) text.push(React.createElement(class extends React.PureComponent {
@@ -104,7 +103,15 @@ module.exports = class UserDetails extends Plugin {
             return res
         })
 
-        dispatcher.subscribe('MESSAGE_CREATE', this.onMessage = m => {
+        FluxDispatcher.subscribe('GUILD_MEMBERS_CHUNK', this.onMembersUpdate = data => {
+            if (!data?.members?.length) return
+            data.members.forEach(m => {
+                this.createCache(m.user.id, data.guildId)
+                cache[m.user.id][data.guildId].joinedAt = m.joined_at ? new Date(m.joined_at) : '-'
+            })
+        })
+
+        FluxDispatcher.subscribe('MESSAGE_CREATE', this.onMessage = m => {
             if (!this.settings.get('lastMessage', true) || !m.message) return
             const msg = m.message, gid = msg.guild_id ? msg.guild_id : msg.channel_id
             this.createCache(msg.author.id, gid)
@@ -112,14 +119,12 @@ module.exports = class UserDetails extends Plugin {
         })
     }
 
-    async pluginWillUnload() {
+    pluginWillUnload() {
         powercord.api.settings.unregisterSettings('user-details')
         uninject('user-details')
 
-        if (this.onMessage) {
-            const dispatcher = await getModule(['dispatch'])
-            dispatcher.unsubscribe('MESSAGE_CREATE', this.onMessage)
-        }
+        if (this.onMembersUpdate) FluxDispatcher.unsubscribe('GUILD_MEMBERS_CHUNK', this.onMembersUpdate)
+        if (this.onMessage) FluxDispatcher.unsubscribe('MESSAGE_CREATE', this.onMessage)
     }
 
     createCache(id, gid) {
@@ -148,30 +153,26 @@ module.exports = class UserDetails extends Plugin {
         return date.toLocaleString(i18n.getLocale(), { hour12: this.settings.get('hour12') })
     }
 
-    fetchMemberPromise(gid, gid2, id, resolve) {
-        const c = cache[id][gid2]
+    fetchJoinedAt(gid, id) {
+        const c = cache[id][gid]
         return new Promise(r => {
-            this.fetchMember(gid, id).then(res => {
-                if (res && res.joined_at) {
-                    c.joinedAt = new Date(res.joined_at)
-                    if (typeof resolve == 'function') resolve(c.joinedAt)
-                    r(c.joinedAt)
-                }
-            }).catch(res => {
-                if (res.body && res.body.code == 10007) { // Unknown Member
-                    c.joinedAt = '-'
-                    if (typeof resolve == 'function') resolve(c.joinedAt)
-                    r(c.joinedAt)
-                } else if (res.body && res.body.retry_after) setTimeout(() => this.fetchMemberPromise(gid, gid2, id, resolve || r), res.body.retry_after + 10)
-                else r('-')
-            })
-        })
-    }
+            const { requestMembersById } = getModule(['requestMembersById'], false)
+            requestMembersById(gid, id)
 
-    // why members in discord cache doesn't have joinedAt :<
-    async fetchMember(gid, id) {
-        const data = await get(Endpoints.GUILD_MEMBER(gid, id))
-        return data.body
+            const sub = data => {
+                if (data.guildId == gid) {
+                    const m = data.members?.find(m => m?.user?.id)
+                    if (m) r(m.joined_at ? new Date(m.joined_at) : '-')
+                    else if (data.notFound?.find(m => m == id)) {
+                        c.joinedAt = '-'
+                        r('-')
+                    } else return
+                    FluxDispatcher.unsubscribe('GUILD_MEMBERS_CHUNK', sub)
+                }
+            }
+
+            FluxDispatcher.subscribe('GUILD_MEMBERS_CHUNK', sub)
+        })
     }
 
     // contains code by Bowser65 (Powercord's server, https://discord.com/channels/538759280057122817/539443165455974410/662376605418782730)
