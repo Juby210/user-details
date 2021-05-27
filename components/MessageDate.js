@@ -15,7 +15,7 @@ module.exports = class MessageDate extends React.PureComponent {
         super(props)
 
         this.props.channelId = channels.getChannelId()
-        this.props.dontFetch = !this.props.guildId && (getCurrentUser().id !== this.props.id && (!getChannel(this.props.channelId) || !getChannel(this.props.channelId).recipients.includes(user.id)))
+        this.props.dontFetch = !this.props.guildId && (getCurrentUser().id !== this.props.id && (!getChannel(this.props.channelId) || !getChannel(this.props.channelId).recipients.includes(this.props.id)))
         
         const guildOrChannel = this.props.guildId || this.props.channelId
         Utils.createCache(guildOrChannel, this.props.id)
