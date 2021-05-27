@@ -1,187 +1,94 @@
+/*
+ * Copyright (c) 2020-2021 Juby210
+ * Licensed under the Open Software License version 3.0
+ */
+
 const { Plugin } = require('powercord/entities')
 const { findInReactTree } = require('powercord/util')
-const { getModule, getModuleByDisplayName, channels, i18n, FluxDispatcher, React } = require('powercord/webpack')
-const { AsyncComponent } = require('powercord/components')
+const { getModule, getModuleByDisplayName, React, FluxDispatcher } = require('powercord/webpack')
 const { inject, uninject } = require('powercord/injector')
-const cache = {}
 
-const Settings = require('./Settings')
+const Utils = require('./utils')
+const Settings = require('./components/Settings')
+const Details = require('./components/UserDetails')
 
 module.exports = class UserDetails extends Plugin {
     async startPlugin() {
-        powercord.api.settings.registerSettings('user-details', {
+        powercord.api.settings.registerSettings(this.entityID, {
             category: this.entityID, label: 'User Details', render: Settings })
         this.loadStylesheet('style.css')
 
+        const UserPopoutHeader = await getModule(m => m.default && m.default.displayName === 'UserPopoutHeader')
+        inject('user-details', UserPopoutHeader, 'default', ([{ user, guildId }], res) => {
+            if (!this.settings.get('profilePopout', true)) return res
+            const children = findInReactTree(res, a => Array.isArray(a) && a.find(c => c?.type?.displayName === 'CustomStatus'))
+            if (children != null) children.splice(2, 0, React.createElement(Details, {
+                user, guildId, popout: true,
+                settings: {
+                    createdAt: this.settings.get('createdAt', true),
+                    joinedAt: this.settings.get('joinedAt', true),
+                    lastMessage: this.settings.get('lastMessage', true),
+                    get: this.settings.get
+                }
+            }))
+            return res
+        })
+        UserPopoutHeader.default.displayName = 'UserPopoutHeader'
+
         const _this = this
-        const g = await getModule(['getGuildId', 'getLastSelectedGuildId'])
-        const { getChannel } = await getModule(['getChannel'])
-        const { getCurrentUser } = await getModule(['getCurrentUser'])
-        const { textRow } = await getModule(['textRow'])
-        const AnalyticsContext = await getModuleByDisplayName('AnalyticsContext')
-
-        inject('user-details', AnalyticsContext.prototype, 'renderProvider', function (_, res) {
-            let arr, popout, text = []
-            if (_this.settings.get('profilePopout', true) && this.props.section == 'Profile Popout') {
-                arr = findInReactTree(res, a => Array.isArray(a) && a.find(c => c && c.type && c.type.displayName == 'CustomStatus'))
-                popout = true
-            } else if (_this.settings.get('profileModal', true) && this.props.section == 'Profile Modal') 
-                arr = findInReactTree(res, a => Array.isArray(a) && a.find(c => c && c.type && c.type.displayName == 'DiscordTag'))
-
-            if (!arr) return res
-
-            const { user } = findInReactTree(arr, p => p.user), gid = g.getGuildId()
-            if (_this.settings.get('createdAt', true)) text.push(React.createElement('div', null, `Created at: ${_this.dateToString(user.createdAt, popout)}`))
-            if (user.discriminator != '0000') {
-                const gid2 = gid || channels.getChannelId()
-                const dontFetchLast = gid ? false : !(getCurrentUser().id == user.id || !getChannel(gid2) || getChannel(gid2).recipients.includes(user.id))
-                _this.createCache(user.id, gid2)
-                const c = cache[user.id][gid2]
-
-                if (_this.settings.get('joinedAt', true) && gid) text.push(React.createElement(AsyncComponent, { _provider: async () => {
-                    const joinedAt = c.joinedAt || await _this.fetchJoinedAt(gid, user.id)
-                    return () => React.createElement('div', null, `Joined at: ${_this.dateToString(joinedAt, popout)}`)
-                }}))
-                if (_this.settings.get('lastMessage', true)) text.push(React.createElement(class extends React.PureComponent {
-                    constructor(props) {
-                        super(props)
-
-                        this.state = { lastMessage: null, firstMessage: null, firstMessageSelected: _this.settings.get('defaultFirstMessage') }
-                    }
-
-                    async componentDidMount() {
-                        if (!this.state.firstMessageSelected && !this.state.lastMessage) this.setState({
-                            lastMessage: dontFetchLast ? '-' : c.lastMessage || await new Promise(r => {
-                                _this.search(user.id, gid2, !gid).then(res => {
-                                    if (res && res.messages && res.messages[0]) {
-                                        const hit = res.messages[0].find(m => m.hit)
-                                        if (!hit) c.lastMessage = '-'
-                                        else c.lastMessage = new Date(hit.timestamp)
-                                    } else c.lastMessage = '-'
-                                    r(c.lastMessage)
-                                }).catch(() => {
-                                    c.lastMessage = '-'
-                                    r(c.lastMessage)
-                                })
-                            })
-                        }); else if (this.state.firstMessageSelected && !this.state.firstMessage) this.setState({
-                            firstMessage: dontFetchLast ? '-' : c.firstMessage || await new Promise(r => {
-                                _this.search(user.id, gid2, !gid, true).then(res => {
-                                    if (res && res.messages && res.messages[0]) {
-                                        const hit = res.messages[0].find(m => m.hit)
-                                        if (!hit) c.firstMessage = '-'
-                                        else c.firstMessage = new Date(hit.timestamp)
-                                    } else c.firstMessage = '-'
-                                    r(c.firstMessage)
-                                }).catch(() => {
-                                    c.firstMessage = '-'
-                                    r(c.firstMessage)
-                                })
-                            })
-                        })
-                    }
-                    componentDidUpdate = this.componentDidMount
-
-                    render() {
-                        if (!this.state.firstMessageSelected && !this.state.lastMessage ||
-                            this.state.firstMessageSelected && !this.state.firstMessage
-                        ) return null
-
-                        if (this.state.firstMessageSelected) return React.createElement('div', dontFetchLast ? null : {
-                            style: { cursor: 'pointer' },
-                            onClick: () => this.setState({ firstMessageSelected: false })
-                        }, `First message: ${_this.dateToString(this.state.firstMessage, popout)}`)
-                        return React.createElement('div', dontFetchLast ? null : {
-                            style: { cursor: 'pointer' },
-                            onClick: () => this.setState({ firstMessageSelected: true })
-                        }, `Last message: ${_this.dateToString(this.state.lastMessage, popout)}`)
-                    }
-                }))
-            }
-            arr.splice(popout ? 2 : 1, 0, React.createElement('div', { className: `user-details-text${popout ? ' user-details-center' : ''} ${textRow}` }, ...text))
-
+        const UserProfileBody = await this._getUserProfileBody()
+        if (UserProfileBody) inject('user-details-modal', UserProfileBody.prototype, 'renderHeader', function (args, res) {
+            if (!_this.settings.get('profileModal', true)) return res
+            const children = findInReactTree(res, a => Array.isArray(a) && a.find(c => c?.type?.displayName === 'DiscordTag'))
+            if (children != null) children.splice(1, 0, React.createElement(Details, {
+                user: this.props.user,
+                guildId: this.props.guildId,
+                settings: {
+                    createdAt: _this.settings.get('createdAt', true),
+                    joinedAt: _this.settings.get('joinedAt', true),
+                    lastMessage: _this.settings.get('lastMessage', true),
+                    get: _this.settings.get
+                }
+            }))
             return res
         })
 
         FluxDispatcher.subscribe('GUILD_MEMBERS_CHUNK', this.onMembersUpdate = data => {
             if (!data?.members?.length) return
             data.members.forEach(m => {
-                this.createCache(m.user.id, data.guildId)
-                cache[m.user.id][data.guildId].joinedAt = m.joined_at ? new Date(m.joined_at) : '-'
+                Utils.createCache(data.guildId, m.user.id)
+                Utils.cache[data.guildId][m.user.id].joinedAt = m.joined_at ? new Date(m.joined_at) : '-'
             })
         })
 
         FluxDispatcher.subscribe('MESSAGE_CREATE', this.onMessage = m => {
             if (!this.settings.get('lastMessage', true) || !m.message) return
             const msg = m.message, gid = msg.guild_id ? msg.guild_id : msg.channel_id
-            this.createCache(msg.author.id, gid)
-            cache[msg.author.id][gid].lastMessage = new Date(msg.timestamp)
+            Utils.createCache(gid, msg.author.id)
+            Utils.cache[gid][msg.author.id].lastMessage = new Date(msg.timestamp)
         })
     }
 
     pluginWillUnload() {
-        powercord.api.settings.unregisterSettings('user-details')
+        powercord.api.settings.unregisterSettings(this.entityID)
         uninject('user-details')
+        uninject('user-details-modal')
 
         if (this.onMembersUpdate) FluxDispatcher.unsubscribe('GUILD_MEMBERS_CHUNK', this.onMembersUpdate)
         if (this.onMessage) FluxDispatcher.unsubscribe('MESSAGE_CREATE', this.onMessage)
     }
 
-    createCache(id, gid) {
-        if (!cache[id]) cache[id] = {}
-        if (!cache[id][gid]) cache[id][gid] = {}
+    // based on https://github.com/cyyynthia/pronoundb-powercord/blob/1ef42d7407b73020ee197e10430c02c269f62f09/index.js#L160-L185
+    async _getUserProfileBody() {
+        try {
+            const UserProfile = await getModuleByDisplayName('UserProfile')
+            const FluxUserProfileBody = UserProfile.prototype.render().type
+            const DecoratedUserProfileBody = this._extractFromFlux(FluxUserProfileBody).render().type
+            return DecoratedUserProfileBody.prototype.render.call({ props: { forwardedRef: null } }).type
+        } catch (e) { console.error('Failed to get UserProfileBody', e) }
     }
 
-    dateToString(date, popout) {
-        if (date == '-') return '-'
-        const customPopout = popout && this.settings.get('custom2')
-        if (this.settings.get('custom') || customPopout) {
-            let h = date.getHours(), ampm = ''
-            if (this.settings.get('hour12')) {
-                ampm = h >= 12 ? 'PM' : 'AM'
-                h = h % 12 || 12
-            }
-            return this.settings.get(customPopout ? 'format2' : 'format', this.settings.get('format', '%d.%m.%y, %H:%M:%S %ampm'))
-                .replace(/%d/g, ('0' + date.getDate()).substr(-2))
-                .replace(/%m/g, ('0' + (date.getMonth() + 1)).substr(-2))
-                .replace(/%y/g, date.getFullYear())
-                .replace(/%H/g, ('0' + h).substr(-2))
-                .replace(/%M/g, ('0' + date.getMinutes()).substr(-2))
-                .replace(/%S/g, ('0' + date.getSeconds()).substr(-2))
-                .replace(/%ampm/g, ampm)
-        }
-        return date.toLocaleString(i18n.getLocale(), { hour12: this.settings.get('hour12') })
-    }
-
-    fetchJoinedAt(gid, id) {
-        const c = cache[id][gid]
-        return new Promise(r => {
-            const { requestMembersById } = getModule(['requestMembersById'], false)
-            requestMembersById(gid, id)
-
-            const sub = data => {
-                if (data.guildId == gid) {
-                    const m = data.members?.find(m => m?.user?.id)
-                    if (m) r(m.joined_at ? new Date(m.joined_at) : '-')
-                    else if (data.notFound?.find(m => m == id)) {
-                        c.joinedAt = '-'
-                        r('-')
-                    } else return
-                    FluxDispatcher.unsubscribe('GUILD_MEMBERS_CHUNK', sub)
-                }
-            }
-
-            FluxDispatcher.subscribe('GUILD_MEMBERS_CHUNK', sub)
-        })
-    }
-
-    // contains code by Bowser65 (Powercord's server, https://discord.com/channels/538759280057122817/539443165455974410/662376605418782730)
-    search(author_id, id, dm, asc) {
-        return new Promise((resolve, reject) => {
-            const Search = getModule(m => m.prototype && m.prototype.retryLater, false)
-            let opts = { author_id, include_nsfw: true }
-            const s = new Search(id, dm ? 'DM' : 'GUILD', asc ? { offset: 0, sort_by: 'timestamp', sort_order: 'asc', ...opts } : opts)
-            s.fetch(res => resolve(res.body), () => void 0, reject)
-        })
+    _extractFromFlux(FluxContainer) {
+        return FluxContainer.prototype.render.call({ memoizedGetStateFromStores: () => null }).type
     }
 }

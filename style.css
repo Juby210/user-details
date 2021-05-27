@@ -1,11 +1,1 @@
-.user-details-text {
-    margin-top: 2px;
-    color: hsla(0, 0%, 100%, .55);
-}
-/* wrr light theme */
-.theme-light .headerNormal-T_seeN .user-details-text, .theme-light .topSectionNormal-2-vo2m .user-details-text {
-    color: hsla(0, 0%, 0%, .55);
-}
-.user-details-center {
-    text-align: center;
-}
+.user-details-text { color: var(--text-normal); }
