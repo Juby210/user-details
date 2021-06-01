@@ -14,6 +14,7 @@ module.exports = class MessageDate extends React.PureComponent {
     constructor(props) {
         super(props)
 
+        if (this.props.guildId === '@me') delete this.props.guildId
         this.props.channelId = channels.getChannelId()
         this.props.dontFetch = !this.props.guildId && (getCurrentUser().id !== this.props.id && (!getChannel(this.props.channelId) || !getChannel(this.props.channelId).recipients.includes(this.props.id)))
         
@@ -27,14 +28,14 @@ module.exports = class MessageDate extends React.PureComponent {
         const { id, guildId, channelId } = this.props
         if (!this.state.firstMessageSelected && !this.state.lastMessage) {
             const guildOrChannel = guildId || channelId
-            const c = Utils.cache[guildOrChannel][id]
-            const lastMessage = c.lastMessage || await Utils.searchFirstHitDate(id, guildOrChannel, !guildId)
+            const c = Utils.cache[guildOrChannel]?.[id]
+            const lastMessage = c?.lastMessage || await Utils.searchFirstHitDate(id, guildOrChannel, !guildId)
             c.lastMessage = lastMessage
             this.setState({ lastMessage })
         } else if (this.state.firstMessageSelected && !this.state.firstMessage) {
             const guildOrChannel = guildId || channelId
-            const c = Utils.cache[guildOrChannel][id]
-            const firstMessage = c.firstMessage || await Utils.searchFirstHitDate(id, guildOrChannel, !guildId, true)
+            const c = Utils.cache[guildOrChannel]?.[id]
+            const firstMessage = c?.firstMessage || await Utils.searchFirstHitDate(id, guildOrChannel, !guildId, true)
             c.firstMessage = firstMessage
             this.setState({ firstMessage })
         }
