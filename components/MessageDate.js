@@ -44,7 +44,6 @@ module.exports = class MessageDate extends React.PureComponent {
             const guildOrChannel = gid || channelId
             Utils.createCache(guildOrChannel, id)
             const c = Utils.cache[guildOrChannel][id]
-            console.log('a', guildOrChannel, id)
             const firstMessage = c.firstMessage || await Utils.searchFirstHitDate(id, guildOrChannel, !gid, true)
             c.firstMessage = firstMessage
             this.setState({ firstMessage })
