@@ -18,12 +18,13 @@ module.exports = class UserDetails extends Plugin {
             category: this.entityID, label: 'User Details', render: Settings })
         this.loadStylesheet('style.css')
 
-        const UserPopoutHeader = await getModule(m => m.default && m.default.displayName === 'UserPopoutHeader')
-        inject('user-details', UserPopoutHeader, 'default', ([{ user, guildId }], res) => {
-            if (!this.settings.get('profilePopout', true)) return res
-            const children = findInReactTree(res, a => Array.isArray(a) && a.find(c => c?.type?.displayName === 'CustomStatus'))
-            if (children != null) children.splice(2, 0, React.createElement(Details, {
-                user, guildId, popout: true,
+        const { getGuildId } = await getModule(['getLastSelectedGuildId'])
+        const UserPopoutInfo = await getModule(m => m.default && m.default.displayName === 'UserPopoutInfo')
+        inject('user-details', UserPopoutInfo, 'default', ([{ user }], res) => {
+            if (Array.isArray(res?.props?.children)) res.props.children.splice(2, 0, React.createElement(Details, {
+                user,
+                guildId: getGuildId(),
+                popout: true,
                 settings: {
                     createdAt: this.settings.get('createdAt', true),
                     joinedAt: this.settings.get('joinedAt', true),
@@ -33,7 +34,7 @@ module.exports = class UserDetails extends Plugin {
             }))
             return res
         })
-        UserPopoutHeader.default.displayName = 'UserPopoutHeader'
+        UserPopoutInfo.default.displayName = 'UserPopoutInfo'
 
         const _this = this
         const UserProfileBody = await this._getUserProfileBody()
