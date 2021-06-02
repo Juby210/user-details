@@ -21,6 +21,7 @@ module.exports = class UserDetails extends Plugin {
         const { getGuildId } = await getModule(['getLastSelectedGuildId'])
         const UserPopoutInfo = await getModule(m => m.default && m.default.displayName === 'UserPopoutInfo')
         inject('user-details', UserPopoutInfo, 'default', ([{ user }], res) => {
+            if (!this.settings.get('profilePopout', true)) return res
             if (Array.isArray(res?.props?.children)) res.props.children.splice(2, 0, React.createElement(Details, {
                 user,
                 guildId: getGuildId(),
