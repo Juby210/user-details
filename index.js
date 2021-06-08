@@ -37,23 +37,23 @@ module.exports = class UserDetails extends Plugin {
         })
         UserPopoutInfo.default.displayName = 'UserPopoutInfo'
 
-        const _this = this
-        const UserProfileBody = await this._getUserProfileBody()
-        if (UserProfileBody) inject('user-details-modal', UserProfileBody.prototype, 'renderHeader', function (args, res) {
-            if (!_this.settings.get('profileModal', true)) return res
+        const UserProfileModalHeader = await getModule(m => m.default && m.default.displayName === 'UserProfileModalHeader')
+        inject('user-details-modal', UserProfileModalHeader, 'default', ([{ user }], res) => {
+            if (!this.settings.get('profileModal', true)) return res
             const children = findInReactTree(res, a => Array.isArray(a) && a.find(c => c?.type?.displayName === 'DiscordTag'))
             if (children != null) children.splice(1, 0, React.createElement(Details, {
-                user: this.props.user,
-                guildId: this.props.guildId,
+                user,
+                guildId: getGuildId(),
                 settings: {
-                    createdAt: _this.settings.get('createdAt', true),
-                    joinedAt: _this.settings.get('joinedAt', true),
-                    lastMessage: _this.settings.get('lastMessage', true),
-                    get: _this.settings.get
+                    createdAt: this.settings.get('createdAt', true),
+                    joinedAt: this.settings.get('joinedAt', true),
+                    lastMessage: this.settings.get('lastMessage', true),
+                    get: this.settings.get
                 }
             }))
             return res
         })
+        UserProfileModalHeader.default.displayName = 'UserProfileModalHeader'
 
         FluxDispatcher.subscribe('GUILD_MEMBERS_CHUNK', this.onMembersUpdate = data => {
             if (!data?.members?.length) return
@@ -78,19 +78,5 @@ module.exports = class UserDetails extends Plugin {
 
         if (this.onMembersUpdate) FluxDispatcher.unsubscribe('GUILD_MEMBERS_CHUNK', this.onMembersUpdate)
         if (this.onMessage) FluxDispatcher.unsubscribe('MESSAGE_CREATE', this.onMessage)
-    }
-
-    // based on https://github.com/cyyynthia/pronoundb-powercord/blob/1ef42d7407b73020ee197e10430c02c269f62f09/index.js#L160-L185
-    async _getUserProfileBody() {
-        try {
-            const UserProfile = await getModuleByDisplayName('UserProfile')
-            const FluxUserProfileBody = UserProfile.prototype.render().type
-            const DecoratedUserProfileBody = this._extractFromFlux(FluxUserProfileBody).render().type
-            return DecoratedUserProfileBody.prototype.render.call({ props: { forwardedRef: null } }).type
-        } catch (e) { console.error('Failed to get UserProfileBody', e) }
-    }
-
-    _extractFromFlux(FluxContainer) {
-        return FluxContainer.prototype.render.call({ memoizedGetStateFromStores: () => null }).type
     }
 }
