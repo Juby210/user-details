@@ -5,7 +5,7 @@
 
 const { Plugin } = require('powercord/entities')
 const { findInReactTree } = require('powercord/util')
-const { getModule, getModuleByDisplayName, React, FluxDispatcher } = require('powercord/webpack')
+const { getModule, React, FluxDispatcher } = require('powercord/webpack')
 const { inject, uninject } = require('powercord/injector')
 
 const Utils = require('./utils')
@@ -41,7 +41,7 @@ module.exports = class UserDetails extends Plugin {
         inject('user-details-modal', UserProfileModalHeader, 'default', ([{ user }], res) => {
             if (!this.settings.get('profileModal', true)) return res
             const children = findInReactTree(res, a => Array.isArray(a) && a.find(c => c?.type?.displayName === 'DiscordTag'))
-            if (children != null) children.splice(1, 0, React.createElement(Details, {
+            if (children != null) children.splice(3, 0, React.createElement(Details, {
                 user,
                 guildId: getGuildId(),
                 settings: {
