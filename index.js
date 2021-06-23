@@ -19,23 +19,39 @@ module.exports = class UserDetails extends Plugin {
         this.loadStylesheet('style.css')
 
         const { getGuildId } = await getModule(['getLastSelectedGuildId'])
-        const UserPopoutInfo = await getModule(m => m.default && m.default.displayName === 'UserPopoutInfo')
-        inject('user-details', UserPopoutInfo, 'default', ([{ user }], res) => {
+
+        // pain.
+        const UserPopoutContainer = await getModule(m => m.type && m.type.displayName === 'UserPopoutContainer')
+        inject('user-details', UserPopoutContainer, 'type', (_, ret) => {
             if (!this.settings.get('profilePopout', true)) return res
-            if (Array.isArray(res?.props?.children)) res.props.children.splice(2, 0, React.createElement(Details, {
-                user,
-                guildId: getGuildId(),
-                popout: true,
-                settings: {
-                    createdAt: this.settings.get('createdAt', true),
-                    joinedAt: this.settings.get('joinedAt', true),
-                    lastMessage: this.settings.get('lastMessage', true),
-                    get: this.settings.get
+            const UserPopout = ret.type
+            ret.type = (...e) => {
+                const r = UserPopout(...e)
+                const infoParent = findInReactTree(r, c => c?.type?.displayName === 'UserPopoutInfo')
+                if (!infoParent) return r
+                const UserPopoutInfo = infoParent.type
+                infoParent.type = (...args) => {
+                    const res = UserPopoutInfo(...args)
+                    if (Array.isArray(res?.props?.children)) res.props.children.splice(2, 0, React.createElement(Details, {
+                        user: args[0].user,
+                        guildId: getGuildId(),
+                        popout: true,
+                        settings: {
+                            createdAt: this.settings.get('createdAt', true),
+                            joinedAt: this.settings.get('joinedAt', true),
+                            lastMessage: this.settings.get('lastMessage', true),
+                            get: this.settings.get
+                        }
+                    }))
+                    return res
                 }
-            }))
-            return res
+                Object.assign(infoParent.type, UserPopoutInfo)
+                return r
+            }
+            Object.assign(ret.type, UserPopout)
+            return ret
         })
-        UserPopoutInfo.default.displayName = 'UserPopoutInfo'
+        UserPopoutContainer.type.displayName = 'UserPopoutContainer'
 
         const UserProfileModalHeader = await getModule(m => m.default && m.default.displayName === 'UserProfileModalHeader')
         inject('user-details-modal', UserProfileModalHeader, 'default', ([{ user }], res) => {
