@@ -23,7 +23,7 @@ module.exports = class UserDetails extends Plugin {
         // pain.
         const UserPopoutContainer = await getModule(m => m.type && m.type.displayName === 'UserPopoutContainer')
         inject('user-details', UserPopoutContainer, 'type', (_, ret) => {
-            if (!this.settings.get('profilePopout', true)) return res
+            if (!this.settings.get('profilePopout', true)) return ret
             const UserPopout = ret.type
             ret.type = (...e) => {
                 const r = UserPopout(...e)
