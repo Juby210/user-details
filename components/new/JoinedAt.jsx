@@ -6,11 +6,12 @@
 const { React } = require('powercord/webpack')
 const { AsyncComponent } = require('powercord/components')
 
-const Utils = require('../utils')
+const Item = require('./Item')
+const Utils = require('../../utils')
 
 module.exports = ({ guildId, id, popout, getSetting }) => <AsyncComponent _provider={async () => {
     Utils.createCache(guildId, id)
     const c = Utils.cache[guildId][id]
     const joinedAt = c.joinedAt || await Utils.fetchJoinedAt(guildId, id)
-    return () => <div>Joined at: {Utils.dateToString(getSetting, joinedAt, popout)}</div>
+    return () => <Item header='Joined at'>{Utils.dateToString(getSetting, joinedAt, popout)}</Item>
 }} />

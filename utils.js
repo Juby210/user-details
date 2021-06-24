@@ -16,7 +16,7 @@ module.exports = class Utils {
     }
 
     static dateToString(getSetting, date, popout) {
-        if (date === '-') return '-'
+        if (!date || date === '-') return '-'
         const customPopout = popout && getSetting('custom2')
         const hour12 = getSetting('hour12')
         if (getSetting('custom') || customPopout) {

@@ -8,7 +8,7 @@ const { React, channels, getModule } = require('powercord/webpack')
 const { getCurrentUser } = getModule(['getCurrentUser'], false) || {}
 const { getChannel } = getModule(['getChannel'], false) || {}
 
-const Utils = require('../utils')
+const Utils = require('../../utils')
 
 module.exports = class MessageDate extends React.PureComponent {
     constructor(props) {

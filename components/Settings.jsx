@@ -6,30 +6,35 @@
 const { React } = require('powercord/webpack')
 const { SwitchItem, TextInput } = require('powercord/components/settings')
 
-module.exports = ({ getSetting, toggleSetting, updateSetting }) => <>
+module.exports = ({ getSetting, toggleSetting, toggleSettingAndReload, updateSetting }) => <>
     <SwitchItem
         value={getSetting('profilePopout', true)}
-        onChange={() => toggleSetting('profilePopout', true)}
+        onChange={() => toggleSettingAndReload('profilePopout', true)}
     >Add details in Profile Popout</SwitchItem>
     <SwitchItem
         value={getSetting('profileModal', true)}
-        onChange={() => toggleSetting('profileModal', true)}
+        onChange={() => toggleSettingAndReload('profileModal', true)}
     >Add details in Profile Modal</SwitchItem>
+    <SwitchItem
+        value={getSetting('useNew', true)}
+        note='Old method is deprecated and will be removed in next updates'
+        onChange={() => toggleSettingAndReload('useNew', true)}
+    >Use new display method</SwitchItem>
 
     <SwitchItem
         value={getSetting('createdAt', true)}
-        onChange={() => toggleSetting('createdAt', true)}
+        onChange={() => toggleSettingAndReload('createdAt', true)}
     >Display "Created at"</SwitchItem>
     <SwitchItem
         value={getSetting('joinedAt', true)}
-        onChange={() => toggleSetting('joinedAt', true)}
+        onChange={() => toggleSettingAndReload('joinedAt', true)}
     >Display "Joined at"</SwitchItem>
     <SwitchItem
         value={getSetting('lastMessage', true)}
         note={getSetting('defaultFirstMessage')
             ? 'Click on "First message" to toggle it to "Last message"'
             : 'Click on "Last message" to toggle it to "First message"'}
-        onChange={() => toggleSetting('lastMessage', true)}
+        onChange={() => toggleSettingAndReload('lastMessage', true)}
     >Display "Last/First message"</SwitchItem>
     <SwitchItem
         value={getSetting('defaultFirstMessage')}

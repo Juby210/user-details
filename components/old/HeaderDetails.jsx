@@ -9,7 +9,7 @@ const { textRow } = getModule(['textRow'], false) || {}
 
 const JoinedAt = require('./JoinedAt')
 const MessageDate = require('./MessageDate')
-const Utils = require('../utils')
+const Utils = require('../../utils')
 
 module.exports = ({ user, guildId, popout, settings }) => <div className={`user-details-text ${textRow} ${popout ? '' : 'user-details-modal'}`}>
     {settings.createdAt ? <div>Created at: {Utils.dateToString(settings.get, user.createdAt, popout)}</div> : null}
