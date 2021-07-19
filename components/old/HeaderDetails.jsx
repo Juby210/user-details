@@ -13,6 +13,6 @@ const Utils = require('../../utils')
 
 module.exports = ({ user, guildId, popout, settings }) => <div className={`user-details-text ${textRow} ${popout ? '' : 'user-details-modal'}`}>
     {settings.createdAt ? <div>Created at: {Utils.dateToString(settings.get, user.createdAt, popout)}</div> : null}
-    {guildId && guildId !== '@me' && user.discriminator !== '0000' && settings.joinedAt ? <JoinedAt guildId={guildId} id={user.id} popout={popout} getSetting={settings.get} /> : null}
-    {user.discriminator !== '0000' && settings.lastMessage ? <MessageDate guildId={guildId} id={user.id} popout={popout} getSetting={settings.get} /> : null}
+    {guildId && guildId !== '@me' && user.discriminator !== '0000' && settings.joinedAt ? <JoinedAt guildId={guildId} id={user.id} popout={popout} getSetting={settings.get} updatePosition={updatePosition} /> : null}
+    {user.discriminator !== '0000' && settings.lastMessage ? <MessageDate guildId={guildId} id={user.id} popout={popout} getSetting={settings.get} updatePosition={updatePosition} /> : null}
 </div>

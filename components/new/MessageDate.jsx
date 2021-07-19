@@ -10,7 +10,7 @@ const { getChannel } = getModule(['getChannel'], false) || {}
 const Item = require('./Item')
 const Utils = require('../../utils')
 
-module.exports = ({ guildId, id, popout, getSetting }) => {
+module.exports = ({ guildId, id, popout, getSetting, updatePosition }) => {
     const channelId = channels.getChannelId()
     const gid = guildId === '@me' ? null : guildId
     const guildOrChannel = gid || channelId
@@ -28,6 +28,7 @@ module.exports = ({ guildId, id, popout, getSetting }) => {
             Utils.searchFirstHitDate(id, guildOrChannel, !gid, true).then(a => {
                 c.firstMessage = a
                 setFirstMessage(a)
+                if (updatePosition) updatePosition()
             })
             return null
         }
@@ -41,6 +42,7 @@ module.exports = ({ guildId, id, popout, getSetting }) => {
         Utils.searchFirstHitDate(id, guildOrChannel, !gid).then(a => {
             c.lastMessage = a
             setLastMessage(a)
+            if (updatePosition) updatePosition()
         })
         return null
     }
