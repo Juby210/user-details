@@ -37,36 +37,12 @@ module.exports = class UserDetails extends Plugin {
         const profilePopout = this.settings.get('profilePopout', true)
         const profileModal = this.settings.get('profileModal', true)
 
-        if (profilePopout) {
-            try {
-                const UserPopoutContainer = await getModule(m => m.type && m.type.displayName === 'UserPopoutContainer')
-                inject('user-details-popout', UserPopoutContainer, 'type', (_, ret) => {
-                    const { type } = ret
-                    ret.type = props => {
-                        const res = type(props)
-                        const body = findInReactTree(res, e => e && e.type && e.type.displayName === 'UserPopoutBody')
-                        if (body) body.props.updatePosition = props.updatePosition
-                        const info = findInReactTree(res, e => e && e.type && e.type.displayName === 'UserPopoutInfo')
-                        if (info) info.props.updatePosition = props.updatePosition
-                        return res
-                    }
-                    Object.assign(ret.type, type)
-                    return ret
-                })
-                UserPopoutContainer.type.displayName = 'UserPopoutContainer'
-            } catch (e) {
-                console.error(e)
-            }
-        }
-
-
         if (this.settings.get('useNew', true)) {
             if (profilePopout) {
                 const UserPopoutBody = await getModule(m => m.default && m.default.displayName === 'UserPopoutBody')
-                inject('user-details', UserPopoutBody, 'default', ([{ user, guild, updatePosition }], res) => {
-                    // console.log(args, res)
+                inject('user-details', UserPopoutBody, 'default', ([{ user, guild }], res) => {
                     if (Array.isArray(res?.props?.children)) res.props.children.push(React.createElement(Details, {
-                        user, guildId: guild?.id, popout: true, settings, updatePosition
+                        user, guildId: guild?.id, popout: true, settings
                     }))
                     return res
                 })
@@ -86,9 +62,9 @@ module.exports = class UserDetails extends Plugin {
         } else {
             if (profilePopout) {
                 const mdl = await getModule(['UserPopoutInfo'])
-                inject('user-details', mdl, 'UserPopoutInfo', ([{ user, updatePosition }], res) => {
+                inject('user-details', mdl, 'UserPopoutInfo', ([{ user }], res) => {
                     if (Array.isArray(res?.props?.children)) res.props.children.splice(2, 0, React.createElement(HeaderDetails, {
-                        user, guildId: getGuildId(), popout: true, settings, updatePosition
+                        user, guildId: getGuildId(), popout: true, settings
                     }))
                     return res
                 })
@@ -126,7 +102,6 @@ module.exports = class UserDetails extends Plugin {
 
     pluginWillUnload() {
         powercord.api.settings.unregisterSettings(this.entityID)
-        uninject('user-details-popout')
         uninject('user-details')
         uninject('user-details-modal')
 

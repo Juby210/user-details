@@ -40,7 +40,6 @@ module.exports = class MessageDate extends React.PureComponent {
             const lastMessage = c.lastMessage || await Utils.searchFirstHitDate(id, guildOrChannel, !gid)
             c.lastMessage = lastMessage
             this.setState({ lastMessage })
-            if (this.props.updatePosition) this.props.updatePosition()
         } else if (this.state.firstMessageSelected && !this.state.firstMessage) {
             const guildOrChannel = gid || channelId
             Utils.createCache(guildOrChannel, id)
@@ -48,7 +47,6 @@ module.exports = class MessageDate extends React.PureComponent {
             const firstMessage = c.firstMessage || await Utils.searchFirstHitDate(id, guildOrChannel, !gid, true)
             c.firstMessage = firstMessage
             this.setState({ firstMessage })
-            if (this.props.updatePosition) this.props.updatePosition()
         }
     }
     componentDidUpdate = this.componentDidMount
