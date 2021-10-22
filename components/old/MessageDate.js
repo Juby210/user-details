@@ -6,7 +6,7 @@
 const { React, channels, getModule } = require('powercord/webpack')
 
 const { getCurrentUser } = getModule(['getCurrentUser'], false) || {}
-const { getChannel } = getModule(['getChannel'], false) || {}
+const { getChannel } = getModule(['getChannel', 'getDMFromUserId'], false) || {}
 
 const Utils = require('../../utils')
 
