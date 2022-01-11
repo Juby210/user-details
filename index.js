@@ -48,17 +48,19 @@ module.exports = class UserDetails extends Plugin {
                 })
                 UserPopoutBody.default.displayName = 'UserPopoutBody'
             }
-            if (profileModal) {
-                const UserInfoBase = await getModule(m => m.default && m.default.displayName === 'UserInfoBase')
-                inject('user-details-modal', UserInfoBase, 'default', ([{ user }], res) => {
-                    const infoSection = findInReactTree(res, c => c?.className && c.className.indexOf('userInfoSection-') !== -1)
-                    if (infoSection) infoSection.children.push(React.createElement(Details, {
-                        user, guildId: getGuildId(), settings
-                    }))
-                    return res
-                })
-                UserInfoBase.default.displayName = 'UserInfoBase'
-            }
+            if (profileModal) this.lazyPatchProfileModal(
+                m => m.default && m.default.displayName === 'UserInfoBase',
+                UserInfoBase => {
+                    inject('user-details-modal', UserInfoBase, 'default', ([{ user }], res) => {
+                        const infoSection = findInReactTree(res, c => c?.className && c.className.indexOf('userInfoSection-') !== -1)
+                        if (infoSection) infoSection.children.push(React.createElement(Details, {
+                            user, guildId: getGuildId(), settings
+                        }))
+                        return res
+                    })
+                    UserInfoBase.default.displayName = 'UserInfoBase'
+                }
+            )
         } else {
             if (profilePopout) {
                 const mdl = await getModule(['UserPopoutInfo'])
@@ -70,18 +72,20 @@ module.exports = class UserDetails extends Plugin {
                 })
                 mdl.UserPopoutInfo.displayName = 'UserPopoutInfo'
             }
-            if (profileModal) {
-                const UserProfileModalHeader = await getModule(m => m.default && m.default.displayName === 'UserProfileModalHeader')
-                inject('user-details-modal', UserProfileModalHeader, 'default', ([{ user }], res) => {
-                    if (!this.settings.get('profileModal', true)) return res
-                    const children = findInReactTree(res, a => Array.isArray(a) && a.find(c => c?.type?.displayName === 'DiscordTag'))
-                    if (children != null) children.splice(3, 0, React.createElement(HeaderDetails, {
-                        user, guildId: getGuildId(), settings
-                    }))
-                    return res
-                })
-                UserProfileModalHeader.default.displayName = 'UserProfileModalHeader'
-            }
+            if (profileModal) this.lazyPatchProfileModal(
+                m => m.default && m.default.displayName === 'UserProfileModalHeader',
+                UserProfileModalHeader => {
+                    inject('user-details-modal', UserProfileModalHeader, 'default', ([{ user }], res) => {
+                        if (!this.settings.get('profileModal', true)) return res
+                        const children = findInReactTree(res, a => Array.isArray(a) && a.find(c => c?.type?.displayName === 'DiscordTag'))
+                        if (children != null) children.splice(3, 0, React.createElement(HeaderDetails, {
+                            user, guildId: getGuildId(), settings
+                        }))
+                        return res
+                    })
+                    UserProfileModalHeader.default.displayName = 'UserProfileModalHeader'
+                }
+            )
         }
 
         if (settings.joinedAt) FluxDispatcher.subscribe('GUILD_MEMBERS_CHUNK', this.onMembersUpdate = data => {
@@ -104,8 +108,36 @@ module.exports = class UserDetails extends Plugin {
         powercord.api.settings.unregisterSettings(this.entityID)
         uninject('user-details')
         uninject('user-details-modal')
+        uninject('user-details-lazy-modal')
 
         if (this.onMembersUpdate) FluxDispatcher.unsubscribe('GUILD_MEMBERS_CHUNK', this.onMembersUpdate)
         if (this.onMessage) FluxDispatcher.unsubscribe('MESSAGE_CREATE', this.onMessage)
+    }
+
+    async lazyPatchProfileModal(filter, patch) {
+        const m = getModule(filter, false)
+        if (m) patch(m)
+        else {
+            const { useModalsStore } = await getModule(['useModalsStore'])
+            inject('user-details-lazy-modal', useModalsStore, 'setState', a => {
+                const og = a[0]
+                a[0] = (...args) => {
+                    const ret = og(...args)
+                    try {
+                        if (ret?.default?.length) {
+                            const el = ret.default[0]
+                            if (el && el.render && el.render.toString().indexOf(',friendToken:') !== -1) {
+                                uninject('user-details-lazy-modal')
+                                patch(getModule(filter, false))
+                            }
+                        } 
+                    } catch (e) {
+                        this.error(e)
+                    }
+                    return ret
+                }
+                return a
+            }, true)
+        }
     }
 }
