@@ -4,7 +4,7 @@
  */
 
 const { React, channels, getModule } = require('powercord/webpack')
-const { getCurrentUser } = getModule(['getCurrentUser'], false) || {}
+const { getCurrentUser } = getModule(['getCurrentUser', 'getUser'], false) || {}
 const { getChannel } = getModule(['getChannel', 'getDMFromUserId'], false) || {}
 
 const Item = require('./Item')
