@@ -39,7 +39,8 @@ module.exports = class UserDetails extends Plugin {
 
         if (this.settings.get('useNew', true)) {
             if (profilePopout) {
-                const UserPopoutBody = await getModule(m => m.default && m.default.displayName === 'UserPopoutBody')
+                const UserPopoutBody = await getModule(m => m.default && m.default.displayName === 'UserPopoutBody' &&
+                    m.default.toString().indexOf('"newPopoutActivityStyles"') !== -1)
                 inject('user-details', UserPopoutBody, 'default', ([{ user, guild }], res) => {
                     if (Array.isArray(res?.props?.children)) res.props.children.push(React.createElement(Details, {
                         user, guildId: guild?.id, popout: true, settings
